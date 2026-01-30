@@ -1,0 +1,279 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useOrg } from "../org-context";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000";
+
+export default function EquipoPage() {
+  const { activeOrgId } = useOrg();
+
+  const [token, setToken] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Invitar
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"MEMBER" | "OWNER">("MEMBER");
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [inviteResult, setInviteResult] = useState<any>(null);
+
+  // Aceptar
+  const [acceptToken, setAcceptToken] = useState("");
+  const [accepting, setAccepting] = useState(false);
+  const [acceptResult, setAcceptResult] = useState<any>(null);
+
+  // Miembros
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const tRes = await fetch("/api/backend/token", { cache: "no-store" });
+        const tData = await tRes.json();
+        if (!tRes.ok) throw new Error(tData?.message || "No backend token");
+        setToken(tData.accessToken);
+      } catch (e: any) {
+        setErr(e.message);
+      }
+    })();
+  }, []);
+
+  async function loadMembers() {
+    if (!token || !activeOrgId) return;
+    setLoadingMembers(true);
+    setErr(null);
+    try {
+      const res = await fetch(`${API_BASE}/orgs/${activeOrgId}/members`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "No members");
+      setMembers(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setErr(e.message);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, activeOrgId]);
+
+  async function createInvite() {
+    if (!token || !activeOrgId || !inviteEmail.trim()) return;
+    setCreatingInvite(true);
+    setErr(null);
+    setInviteResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/orgs/${activeOrgId}/invites`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Invite failed");
+
+      setInviteResult(data);
+      setInviteEmail("");
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setCreatingInvite(false);
+    }
+  }
+
+  async function acceptInvite() {
+    if (!token || !acceptToken.trim()) return;
+    setAccepting(true);
+    setErr(null);
+    setAcceptResult(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/invites/accept`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ token: acceptToken.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Accept failed");
+
+      setAcceptResult(data);
+      setAcceptToken("");
+      await loadMembers();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  async function removeMember(userId: string) {
+    if (!token || !activeOrgId) return;
+    setErr(null);
+    try {
+      const res = await fetch(`${API_BASE}/orgs/${activeOrgId}/members/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || "Remove failed");
+      await loadMembers();
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  }
+
+  if (!activeOrgId) return <div className="text-white/70">Selecciona una empresa.</div>;
+  if (!token) return <div className="text-white/70">Inicia sesión.</div>;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="text-sm text-white/60">Equipo</div>
+        <h1 className="text-2xl font-semibold">Miembros e invitaciones</h1>
+      </div>
+
+      {err && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-200">
+          {err}
+        </div>
+      )}
+
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+        <div className="font-semibold mb-4">Invitar miembro</div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px] gap-3 items-end">
+          <div>
+            <div className="text-xs text-white/60 mb-1">Email</div>
+            <input
+              className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
+              placeholder="correo@empresa.com"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <div className="text-xs text-white/60 mb-1">Rol</div>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as any)}
+              className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
+            >
+              <option value="MEMBER" className="bg-[#0b1c2d] text-white">MEMBER</option>
+              <option value="OWNER" className="bg-[#0b1c2d] text-white">OWNER</option>
+            </select>
+          </div>
+
+          <button
+            onClick={createInvite}
+            disabled={creatingInvite || !inviteEmail.trim()}
+            className="rounded-xl px-4 py-2 text-sm bg-[#337ca0] hover:bg-[#337ca0]/90 disabled:opacity-50"
+          >
+            {creatingInvite ? "Creando..." : "Crear"}
+          </button>
+        </div>
+
+        {inviteResult && (
+          <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-4">
+            <div className="text-sm font-semibold">Invitación creada ✅</div>
+            <div className="mt-2 text-sm text-white/70">
+              Copia este token y compártelo con el invitado:
+            </div>
+            <div className="mt-2 text-xs text-white/60 break-all">
+              <b>Token:</b>{" "}
+              <span className="text-white">{inviteResult.token ?? inviteResult.id}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+        <div className="font-semibold mb-4">Aceptar invitación</div>
+
+        <div className="flex flex-col md:flex-row gap-3 items-end">
+          <div className="flex-1">
+            <div className="text-xs text-white/60 mb-1">Token</div>
+            <input
+              className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
+              placeholder="Pega aquí el token..."
+              value={acceptToken}
+              onChange={(e) => setAcceptToken(e.target.value)}
+            />
+          </div>
+
+          <button
+            onClick={acceptInvite}
+            disabled={accepting || !acceptToken.trim()}
+            className="rounded-xl px-4 py-2 text-sm bg-white/10 hover:bg-white/15 disabled:opacity-50"
+          >
+            {accepting ? "Aceptando..." : "Aceptar"}
+          </button>
+        </div>
+
+        {acceptResult && (
+          <div className="mt-4 text-sm text-emerald-200">✅ Invitación aceptada.</div>
+        )}
+      </div>
+
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="font-semibold">Miembros</div>
+          <button
+            onClick={loadMembers}
+            className="rounded-xl px-3 py-2 text-sm bg-white/10 hover:bg-white/15"
+          >
+            Recargar
+          </button>
+        </div>
+
+        {loadingMembers ? (
+          <div className="text-sm text-white/60">Cargando...</div>
+        ) : members.length === 0 ? (
+          <div className="text-sm text-white/60">No hay miembros.</div>
+        ) : (
+          <div className="space-y-2">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {m.user?.name ?? m.user?.email ?? m.userId}
+                  </div>
+                  <div className="text-xs text-white/60 truncate">{m.user?.email ?? m.userId}</div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs rounded-lg px-2 py-1 bg-white/10">{m.role}</span>
+
+                  <button
+                    onClick={() => removeMember(m.userId)}
+                    className="text-xs rounded-lg px-2 py-1 bg-[#6a0000] hover:bg-[#6a0000]/90"
+                    title="Eliminar del equipo"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
