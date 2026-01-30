@@ -17,7 +17,7 @@ export default function EquipoPage() {
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteResult, setInviteResult] = useState<any>(null);
 
-  // Aceptar
+  // Aceptar (solo para pruebas internas; luego lo quitamos porque será por /accept)
   const [acceptToken, setAcceptToken] = useState("");
   const [accepting, setAccepting] = useState(false);
   const [acceptResult, setAcceptResult] = useState<any>(null);
@@ -188,21 +188,32 @@ export default function EquipoPage() {
         </div>
 
         {inviteResult && (
-          <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-4 space-y-2">
             <div className="text-sm font-semibold">Invitación creada ✅</div>
-            <div className="mt-2 text-sm text-white/70">
-              Copia este token y compártelo con el invitado:
+
+            <div className="text-xs text-white/60 break-all">
+              <b>Token:</b> <span className="text-white">{inviteResult.token ?? inviteResult.id}</span>
             </div>
-            <div className="mt-2 text-xs text-white/60 break-all">
-              <b>Token:</b>{" "}
-              <span className="text-white">{inviteResult.token ?? inviteResult.id}</span>
+
+            {inviteResult.link && (
+              <div className="text-xs text-white/60 break-all">
+                <b>Link:</b>{" "}
+                <a className="text-white underline" href={inviteResult.link} target="_blank" rel="noreferrer">
+                  {inviteResult.link}
+                </a>
+              </div>
+            )}
+
+            <div className="text-xs text-white/40">
+              (MVP) Luego enviaremos este link por correo automáticamente.
             </div>
           </div>
         )}
       </div>
 
+      {/* Solo para pruebas, luego lo quitamos */}
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-        <div className="font-semibold mb-4">Aceptar invitación</div>
+        <div className="font-semibold mb-4">Aceptar invitación (pruebas)</div>
 
         <div className="flex flex-col md:flex-row gap-3 items-end">
           <div className="flex-1">
