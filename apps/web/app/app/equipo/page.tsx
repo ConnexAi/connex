@@ -14,13 +14,9 @@ export default function EquipoPage() {
   // Invitar
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"MEMBER" | "OWNER">("MEMBER");
+  const [daysValid, setDaysValid] = useState<number>(7);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [inviteResult, setInviteResult] = useState<any>(null);
-
-  // Aceptar (solo para pruebas internas; luego lo quitamos porque será por /accept)
-  const [acceptToken, setAcceptToken] = useState("");
-  const [accepting, setAccepting] = useState(false);
-  const [acceptResult, setAcceptResult] = useState<any>(null);
 
   // Miembros
   const [members, setMembers] = useState<any[]>([]);
@@ -76,7 +72,11 @@ export default function EquipoPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          role: inviteRole,     // si tu backend aún no usa role, igual no rompe
+          daysValid: daysValid, // si tu backend aún no usa daysValid, igual no rompe
+        }),
       });
 
       const data = await res.json();
@@ -88,35 +88,6 @@ export default function EquipoPage() {
       setErr(e.message);
     } finally {
       setCreatingInvite(false);
-    }
-  }
-
-  async function acceptInvite() {
-    if (!token || !acceptToken.trim()) return;
-    setAccepting(true);
-    setErr(null);
-    setAcceptResult(null);
-
-    try {
-      const res = await fetch(`${API_BASE}/invites/accept`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ token: acceptToken.trim() }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Accept failed");
-
-      setAcceptResult(data);
-      setAcceptToken("");
-      await loadMembers();
-    } catch (e: any) {
-      setErr(e.message);
-    } finally {
-      setAccepting(false);
     }
   }
 
@@ -144,6 +115,10 @@ export default function EquipoPage() {
       <div>
         <div className="text-sm text-white/60">Equipo</div>
         <h1 className="text-2xl font-semibold">Miembros e invitaciones</h1>
+        <p className="mt-1 text-sm text-white/60">
+          Invita por correo. El invitado aceptará desde Connex en{" "}
+          <span className="text-white/80">/accept</span>.
+        </p>
       </div>
 
       {err && (
@@ -152,10 +127,11 @@ export default function EquipoPage() {
         </div>
       )}
 
+      {/* INVITAR */}
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
         <div className="font-semibold mb-4">Invitar miembro</div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_160px] gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_140px_160px] gap-3 items-end">
           <div>
             <div className="text-xs text-white/60 mb-1">Email</div>
             <input
@@ -178,12 +154,24 @@ export default function EquipoPage() {
             </select>
           </div>
 
+          <div>
+            <div className="text-xs text-white/60 mb-1">Días</div>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={daysValid}
+              onChange={(e) => setDaysValid(Number(e.target.value))}
+              className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
+            />
+          </div>
+
           <button
             onClick={createInvite}
             disabled={creatingInvite || !inviteEmail.trim()}
             className="rounded-xl px-4 py-2 text-sm bg-[#337ca0] hover:bg-[#337ca0]/90 disabled:opacity-50"
           >
-            {creatingInvite ? "Creando..." : "Crear"}
+            {creatingInvite ? "Creando..." : "Enviar invitación"}
           </button>
         </div>
 
@@ -205,41 +193,13 @@ export default function EquipoPage() {
             )}
 
             <div className="text-xs text-white/40">
-              (MVP) Luego enviaremos este link por correo automáticamente.
+              Si el correo está configurado, el invitado lo recibirá automáticamente.
             </div>
           </div>
         )}
       </div>
 
-      {/* Solo para pruebas, luego lo quitamos */}
-      <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
-        <div className="font-semibold mb-4">Aceptar invitación (pruebas)</div>
-
-        <div className="flex flex-col md:flex-row gap-3 items-end">
-          <div className="flex-1">
-            <div className="text-xs text-white/60 mb-1">Token</div>
-            <input
-              className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
-              placeholder="Pega aquí el token..."
-              value={acceptToken}
-              onChange={(e) => setAcceptToken(e.target.value)}
-            />
-          </div>
-
-          <button
-            onClick={acceptInvite}
-            disabled={accepting || !acceptToken.trim()}
-            className="rounded-xl px-4 py-2 text-sm bg-white/10 hover:bg-white/15 disabled:opacity-50"
-          >
-            {accepting ? "Aceptando..." : "Aceptar"}
-          </button>
-        </div>
-
-        {acceptResult && (
-          <div className="mt-4 text-sm text-emerald-200">✅ Invitación aceptada.</div>
-        )}
-      </div>
-
+      {/* MIEMBROS */}
       <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="font-semibold">Miembros</div>
